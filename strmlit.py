@@ -1,5 +1,5 @@
 import streamlit as st
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain.schema import HumanMessage, AIMessage
 from langchain_community.utilities import SQLDatabase
 from langchain_mistralai import ChatMistralAI
 from langchain_core.prompts import FewShotPromptTemplate, PromptTemplate
