@@ -96,7 +96,7 @@ def get_results(question, results):
     return result
 ####################################################################
 
-
+set_page_config(page_title = "Kadzo", page_icon= ":shark:")
 if "chat_history" not in st.session_state:
     st.session_state.chat_history=[
         AIMessage(content="Hello! I am Kadzo, KEMRI AI Library Assistant. Ask me any question about the publications database")
