@@ -29,8 +29,9 @@ tavily_key = os.getenv("TAVILY_API_KEY")
 db_uri = f"mysql+mysqlconnector://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
 
 db = SQLDatabase.from_uri(db_uri)
-context = db.get_context()
-schema_text = context["table_info"]
+context = db.get_table_info()
+#schema_text = context["table_info"]
+schema_text = db.get_table_info(['refs', 'author_publication1', 'author_alias', 'people'])
 #print(context.keys())
 
 llm = ChatMistralAI(api_key=api_key, model="open-mistral-7b", max_tokens=1024)
@@ -46,6 +47,7 @@ db_prompt = FewShotPromptTemplate(
     input_variables = ["schema", "question"]
 )
 
+
 db_chain = (RunnablePassthrough.assign(schema = lambda x: x["schema"])
             | db_prompt
             | llm
@@ -53,6 +55,8 @@ db_chain = (RunnablePassthrough.assign(schema = lambda x: x["schema"])
             )
 
 def run_query(sql: str):
+    if "limit" not in sql.lower():
+        sql = sql.rstrip(";") + " LIMIT 50"
     try:
         result = db.run(sql)
         return {"sql": sql, "result": result}
@@ -128,7 +132,8 @@ st.set_page_config(page_title = "Kadzo", page_icon= ":shark:")
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = [
 
-        AIMessage(content="Hello! I am Kadzo, ***The first ever AI-Agent to work at KEMRI***. I am a library assistant designed and developed by Alex Maina")
+        AIMessage(content="Hello! I am Kadzo, ***The first ever AI-Agent to work at KEMRI***." \
+        " I am a library assistant designed and developed by Alex Maina.\n **Ask me any question about KEMRI-WELLCOME TRUST RESEARCH PROGRAMME PUBLICATIONS**")
     ]
 
 for message in st.session_state.chat_history:
