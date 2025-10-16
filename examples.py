@@ -1,6 +1,6 @@
 def example_scripts():
     examples = [
-        {"question": "List all publications", "query": "SELECT author,title,accession_number as PMID FROM refs ORDER BY ID DESC LIMIT 0,10;",},
+        {"question": "List all publications", "query": "SELECT author,title,accession_number as PMID FROM refs ORDER BY ID DESC;",},
 
         {"question": "List all publications published between the months of January and June in the year 2025",
         "query":"SELECT title,author FROM refs WHERE YEAR = 2025 AND MONTH(STR_TO_DATE(edition, '%Y/%m/%d')) BETWEEN 1 AND 6;",
@@ -45,10 +45,10 @@ def example_scripts():
          
         },
         {"question": "List all publications published by Philip Bejon between the months of January and June in 		the year 2025",
-        "query":"SELECT COUNT(DISTINCT refs.id) FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE authorname LIKE '%Bejon P%' AND YEAR = 2025 AND MONTH(STR_TO_DATE(edition, '%Y/%m/%d')) BETWEEN 1 AND 6;",
+        "query":"SELECT author, title,accession_number as PMID FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE authorname LIKE '%Bejon P%' AND YEAR = 2025 AND MONTH(STR_TO_DATE(edition, '%Y/%m/%d')) BETWEEN 1 AND 6;",
         },
         {"question": "List all articles published by Philip Bejon between the months of January and June in 		the year 2025",
-        "query":"SELECT COUNT(DISTINCT refs.id) FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE authorname LIKE '%Bejon P%' AND YEAR = 2025 AND MONTH(STR_TO_DATE(edition, '%Y/%m/%d')) BETWEEN 1 AND 6;",
+        "query":"SELECT author,title,accession_number as PMID FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE authorname LIKE '%Bejon P%' AND YEAR = 2025 AND MONTH(STR_TO_DATE(edition, '%Y/%m/%d')) BETWEEN 1 AND 6;",
         },
         {"question":"List all articles published by Edwine Barasa",
          "query": "SELECT author,title,accession_number as PMID FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE people.authorname LIKE '%Barasa E%';",
@@ -60,10 +60,13 @@ def example_scripts():
          "query": "SELECT author,title,accession_number as PMID FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE people.authorname LIKE '%Barasa E%' ORDER BY refs.id DESC;",
         },
         {"question":"List all articles published by Philip Bejon",
-         "query": "SELECT author,title,accession_number as PMID FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE people.authorname LIKE '%Bejon P%' ORDER BY refs.id DESC LIMIT 50;",
+         "query": "SELECT author,title,accession_number as PMID FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE people.authorname LIKE '%Bejon P%' ORDER BY refs.id DESC;",
+        },
+        {"question":"List all publications published by Philip Bejon",
+         "query": "SELECT author,title,accession_number as PMID FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE people.authorname LIKE '%Bejon P%' ORDER BY refs.id DESC;",
         },
         {"question":"List all articles published by Sophie Uyoga",
-         "query": "SELECT author,title,accession_number as PMID FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE people.authorname LIKE '%Uyoga S%' ORDER BY refs.id DESC LIMIT 50;",
+         "query": "SELECT author,title,accession_number as PMID FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE people.authorname LIKE '%Uyoga S%' ORDER BY refs.id DESC",
         },
         
     ]

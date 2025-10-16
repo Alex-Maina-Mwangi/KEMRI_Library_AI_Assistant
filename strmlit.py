@@ -69,9 +69,24 @@ response_prompt = PromptTemplate(
                 The user asked: {question}
                 The SQL executed was: {sql}
                 The database returned this result: {result}
+                Using all three columns, list each article on a new line in the following format:
+                <author(s)>, - <title>,(PMID: <PMID>\n)
+                
+
+                
+
+                Important:
+                - Do NOT summarize or omit any entries.
+                - Do NOT use ellipses (...).
+                - Return the complete list exactly as provided.
+                - Do not add messages like "the rest are listed in the SQL query result".
+
+                Return everything verbatim.
+
+                If there are multiple authors, include them all as provided in the result.
                 Answer the user's question directly in natural language. 
                 Do NOT explain or rewrite the SQL. Just give a concise response.
-                """ 
+                """  
     )
 
 full_chain = (RunnablePassthrough.assign(schema = lambda x: x["schema"])
