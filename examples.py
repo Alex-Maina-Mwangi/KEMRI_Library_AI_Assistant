@@ -27,7 +27,7 @@ def example_scripts():
         "query": "SELECT COUNT(DISTINCT refs.id) FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE people.authorname LIKE '%Osier F%';",
         },
         {"question": "list all publications published by Faith Osier",
-        "query": "SELECT title,accession_number FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE people.authorname LIKE '%Osier F%' ORDER BY refs.id DESC;",
+        "query": "SELECT author, title,accession_number FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE people.authorname LIKE '%Osier F%' ORDER BY refs.id DESC;",
 
         },
         
