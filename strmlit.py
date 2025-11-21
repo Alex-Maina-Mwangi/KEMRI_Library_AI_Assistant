@@ -1,17 +1,17 @@
 from langchain_community.utilities import SQLDatabase
 from langchain_mistralai import ChatMistralAI
-#from langchain_community.tools.tavily_search import TavilySearchResults
-from langchain_tavily import TavilySearch
 from langchain_core.prompts import FewShotPromptTemplate, PromptTemplate
-from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 from examples import example_scripts
+from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 from langchain_core.output_parsers import StrOutputParser
-from langchain.schema import HumanMessage, AIMessage
-import streamlit as st
 
 
 from dotenv import load_dotenv
-import os,re
+import os,ast
+import pandas as pd
+import streamlit as st
+from langchain_core.messages import AIMessage,HumanMessage
+from langchain_tavily import TavilySearch
 
 load_dotenv()
 
@@ -20,36 +20,33 @@ db_password = os.getenv("DB_PASSWORD")
 db_host = os.getenv("DB_HOST")
 db_port = os.getenv("DB_PORT")
 db_name = os.getenv("DB_NAME")
-
-
 api_key = os.getenv("MISTRAL_API_KEY")
 tavily_key = os.getenv("TAVILY_API_KEY")
+
+#get schema text
 db_uri = f"mysql+mysqlconnector://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
 db = SQLDatabase.from_uri(db_uri)
+schema_text = db.get_context()["table_info"]
 
-context = db.get_context()
-schema_text = context["table_info"]
-
+#set-up llm
 llm = ChatMistralAI(api_key=api_key, model="open-mistral-7b", max_tokens=4096, temperature=0.0)
 
-
-# --- Few-shot SQL prompt ---
+#sql prompt
 example_prompt = PromptTemplate.from_template("Question:{question}\nQuery:{query}\n")
 sql_prompt = FewShotPromptTemplate(
-    examples=example_scripts(),
-    example_prompt=example_prompt,
-    prefix="You are an expert SQL assistant. Use the database {schema} below to write a valid SQL query that answers the question.",
-    suffix="Question:{question}\nReturn only a valid SQL query in one line. Do not explain, do not add text, do not format in markdown.\nSQL Query:",
-    input_variables=["schema", "question"]
+    examples = example_scripts(),
+    example_prompt = example_prompt,
+    prefix = """You are an expert SQL assistant.Use the database {schema} below to write a valid SQL query that answers the question.""",
+    suffix = """Question:{question}\n Return only a valid SQL query in one line. Do not explain, do not add text, do not format in markdown.SQL Query:""",
+    input_variables = ["schema", "question"]
 )
 
-# --- SQL generation chain ---
-sql_chain = (
-    RunnablePassthrough.assign(schema=lambda x: x["schema"])
-    | sql_prompt
-    | llm
-    | StrOutputParser()
-)
+sql_chain = (RunnablePassthrough.assign(schema = lambda x: x["schema"])
+             | sql_prompt
+             | llm
+             | StrOutputParser()
+             )
+
 
 
 # --- Intent detection prompt ---
@@ -67,159 +64,197 @@ Answer with one word only: count, list, or other.
 """
 )
 
+#intent chain
 intent_chain = intent_prompt | llm | StrOutputParser()
 
-
-# --- Updated run_query() with pagination + total count ---
-def run_query(sql: str, page: int = 1, page_size: int = 50):
-    """
-    Execute a paginated SQL query safely.
-    Automatically adds LIMIT/OFFSET and computes total pages.
-    """
+#run query function to extract the sql query and the result as a dictionary(key/value)
+def run_query(sql: str):
+    if "limit" not in sql:
+        sql = sql.rstrip(";")
     try:
-        sql = sql.strip().rstrip(";")
-
-        # Remove existing LIMIT/OFFSET/ORDER BY for reuse
-        sql_clean = re.sub(r"(?i)\bLIMIT\s+\d+(\s*,\s*\d+)?", "", sql)
-        sql_clean = re.sub(r"(?i)\bOFFSET\s+\d+", "", sql_clean)
-        sql_clean = sql_clean.strip()
-
-        # Pagination
-        offset = (page - 1) * page_size
-        paginated_sql = f"{sql_clean} LIMIT {page_size} OFFSET {offset}"
-
-        # Main query
-        result = db.run(paginated_sql)
-
-        # Count query
-        count_sql = re.sub(r"(?i)\bORDER\s+BY\s+[\w\s,`\.]+", "", sql_clean)
-        count_sql = f"SELECT COUNT(*) as total FROM ({count_sql}) as subquery"
-        total_count = 0
-        try:
-            count_result = db.run(count_sql)
-            if isinstance(count_result, list) and count_result and "total" in count_result[0]:
-                total_count = count_result[0]["total"]
-        except Exception as e:
-            #print(f"[DEBUG] Count query failed: {e}")
-            total_count = len(result) if isinstance(result, list) else 0
-
-        total_pages = max((total_count + page_size - 1) // page_size, 1)
-
-        #print("\n[DEBUG] SQL executed:", paginated_sql)
-        #print("[DEBUG] Count SQL:", count_sql)
-        #print("[DEBUG] Total count:", total_count, "| Total pages:", total_pages)
-
-        return {
-            "sql": paginated_sql,
-            "result": result,
-            "page": page,
-            "page_size": page_size,
-            "total_count": total_count,
-            "total_pages": total_pages,
-        }
-
+        result = db.run(sql)
+        if isinstance(result, str):
+            return {"sql": sql, "result": [{"Result": result}]}
+        elif isinstance(result,list):
+            return {"sql": sql, "result": result}
+        else:
+            try:
+                rows = [dict(row) for row in result]
+                return {"sql": sql, "result": rows}
+            except Exception:
+                return {"sql": sql, "result": str(result)}
     except Exception as e:
-        print("[DEBUG] SQL ERROR:", str(e))
-        return {"sql": sql, "result": f"SQL Error: {str(e)}"}
+        return {"sql": sql, "result": f"SQL ERROR:{str(e)}"}
 
 
-# --- Cleaned response prompt ---
-response_prompt = """
-You are a helpful data analysis assistant.
+def export_to_excel(data, filename="output.xlsx"):
+    if not data:
+        print("No data available")
+        return None
+    all_entries = []
 
-Your job is to read the following information and produce a **clear, human-readable answer** for the user.
+    for item in data:
+        raw_results = item.get("Result", "[]")
+        try:
+            parsed_results = ast.literal_eval(raw_results)
+        except(SyntaxError,ValueError):
+            parsed_results = []
+    
+    for author,title,pmid in parsed_results:
+        all_entries.append({
+            "Authors": author,
+            "Title": title,
+            "PMID": pmid
+        })
+    if not all_entries:
+        print("No valid Entries")
+        return None
+    
+    df = pd.DataFrame(all_entries)
+    df.to_excel(filename, index=False)
+    print("Successfully created an excel file named: {filename}")
+    return filename
 
-Rules:
-- Do NOT mention SQL queries or debug info.
-- Summarize article data as a readable list:
-  “**Here are the articles by [Author] ordered by the most recent**:” followed by author, title, and PMID.
-- If empty, respond: “No matching records were found.”
-- If many results, show only the first 10 and end with “...and more.”
----
 
-**User Question:**
-{question}
-
-**Database Result:**
-{result}
-"""
-
-# --- Count response prompt ---
-count_response_prompt = PromptTemplate(
+# --- Response prompt for lists ---
+response_prompt = PromptTemplate(
     input_variables=["question", "sql", "result"],
     template="""
-You are a precise data assistant.
 The user asked: {question}
+The SQL executed was: {sql}
 The database returned this result: {result}
 
-If the result includes a numeric count (COUNT(*) = N),
-respond in this format:
-"<Author name> has published a total of <N> articles."
+Task:
+You must ONLY return a list of articles from the result data.
+
+STRICT RULES (do NOT break these):
+- Do NOT add explanations.
+- Do NOT add summaries.
+- Do NOT add background information.
+- Do NOT add narrative paragraphs.
+- Do NOT mention departments, years, journals, findings, or interpretations.
+- Do NOT answer in natural-language prose.
+- Do NOT provide context or commentary of any kind.
+- Do NOT rewrite or explain the SQL.
+
+If the result is empty, return exactly:
+No results found.
+
+Otherwise, return ONLY a list formatted as:
+<author> — <title> (PMID: <PMID>)
+
+Each article must be on its own line.
+Return NOTHING except the list. No additional text before or after.
 """
 )
 
 
-# --- Function-based list_result() runnable ---
-def list_result(question: str, schema: str, page: int = 1, page_size: int = 50):
-    """
-    Generate and execute a paginated SQL query based on a 'list' request,
-    then return a clean, natural-language summary of the results.
-    """
-    chain = (
-        RunnablePassthrough.assign(schema=lambda x: x["schema"])
-        | sql_chain
-        | RunnableLambda(lambda sql: {"sql": sql})
-        | RunnableLambda(lambda x: {
-            "question": question,
-            "schema": schema,
-            "sql": x["sql"],
-            "result_data": run_query(x["sql"], page=page, page_size=page_size),
-        })
-        | RunnableLambda(lambda x: response_prompt.format(
-            question=x["question"],
-            result=x["result_data"]["result"]
-        ))
-        | llm
-        | StrOutputParser()
-    )
-    return chain.invoke({"schema": schema, "question": question})
+
+#Response prompt for counts
+count_response_prompt = PromptTemplate(
+    input_variables=["question", "sql", "result"],
+    template="""
+You are a precise data assistant.
+
+The user asked: {question}
+The SQL executed was: {sql}
+The database returned this result: {result}
+
+Instructions:
+- Extract the numeric value from the SQL result. For example, if the result is [{{'COUNT(DISTINCT refs.id)': 4307}}], the number is 4307.
+- Respond concisely in one sentence only.
+- Always use this format for total counts:
+
+"There are a total of <number> articles."
+
+Replace <number> with the exact count from the SQL result.
+Do not include any explanations, examples, or SQL statements.
+"""
+)
 
 
-# --- Count chain ---
-def count_result(question: str, schema: str):
-    chain = (
-        RunnablePassthrough.assign(schema=lambda x: x["schema"])
-        | sql_chain
-        | RunnableLambda(lambda sql: {"sql": sql})
-        | RunnableLambda(lambda x: {
-            "question": question,
-            "sql": x["sql"],
-            "result": run_query(x["sql"])["result"]
-        })
-        | count_response_prompt
-        | llm
-        | StrOutputParser()
-    )
-    return chain.invoke({"schema": schema, "question": question})
+def list_results(question: str, schema: str):
+    chain = (RunnablePassthrough.assign(schema = lambda x: x["schema"])
+             | sql_chain
+             | RunnableLambda(lambda sql: {"sql": sql})
+             | RunnableLambda(lambda x: {
+                 "question": question,
+                 "sql": x["sql"],
+                 "result": run_query(x["sql"])["result"]
+             })
+             | RunnablePassthrough.assign(
+                 question = lambda x: x["question"],
+                 sql = lambda x: x["sql"],
+                 result = lambda x: x["result"]
+             )
+             | response_prompt
+             | llm
+             | StrOutputParser()
+             )
+    response_text = chain.invoke({"question": question, "schema": schema})
+    sql = sql_chain.invoke({"question": question, "schema": schema_text})
+    data = run_query(sql)["result"]
+    return {"response": response_text, "data": data }
 
 
-# --- Full chain controller ---
+
+
+def count_results(question: str, schema: str):
+    chain = (RunnablePassthrough.assign(schema = lambda x: x["schema"])
+             | sql_chain
+             | RunnableLambda(lambda sql: {"sql": sql})
+             | RunnableLambda(lambda x: {
+                "question": question,
+                 "sql": x["sql"],
+                 "result": run_query(x["sql"])["result"]
+             })
+             
+             | count_response_prompt
+             | llm
+             | StrOutputParser()
+             )
+    return chain.invoke({"question": question, "schema": schema})
+    
+
 def full_chain(question: str, schema: str):
-    intent = intent_chain.invoke({"question": question}).strip().lower()
-    print(f"Detected intent: {intent}")
-
-    if intent == "count":
-        return count_result(question, schema)
-    elif intent == "list":
-        return list_result(question, schema, page=1)
+    intent = intent_chain.invoke({"question":question}).strip().lower()
+    print(f"Detected intent:{intent}")
+    if intent == "list":
+        return list_results(question, schema)
+    elif intent == "count":
+        return count_results(question, schema)
     else:
-        return "I'm not sure what kind of answer you need. Could you please rephrase your question?"
+        return {"response": ("Unfortunately, I am not able to get what you rae looking for. Could you rephrase your question"),
+                "data": None
+                }
 
 
-# --- Test run ---
-#question = "How many articles published by Edwine Barasa"
+#question = "What is the total number of publications"
+#question = "List all publications published in the year 2024"
+#result = sql_chain.invoke({"question": question, "schema": schema_text})
 #result = full_chain(question, schema_text)
-#print("\n[FINAL OUTPUT]\n", result)
+
+
+#print(last_query_data)
+
+#if isinstance (result,dict):
+#    final_data = result.get("data")
+#    print(final_data)
+#else:
+#    print(result)
+
+def user_feedback(user_reply: str):
+    if user_reply.strip().lower() in ["y", "yes", "yeah", "ok", "sure"]:
+        filepath = export_to_excel(final_data)
+        if filepath:
+            return f"Successfully exported data to Excel file {filepath}"
+        else:
+            return "No valid data available"
+    else:
+        return "No Excel file was created"
+
+
+
 
 
 search_tool = TavilySearch(max_results=5, tavily_api_key= tavily_key)
@@ -244,7 +279,25 @@ def agent_router(question: str, result):
     if any(word in q_lower for word in db_keywords):
         # Call your full_chain for DB queries
         result = full_chain(question, schema_text)
-        return result
+        if isinstance(result,dict):
+            final_data = result.get("data")
+            result_str = final_data[0]["Result"]
+            # safely convert string → Python list
+            result_list = ast.literal_eval(result_str)
+            response_str = ""
+
+            for i, (authors,year,title,secondary_title, pmid) in enumerate(result_list, start=1):
+                response_str += (
+                    f"{i}. {authors}, {year}, {title}, "
+                    f"**{secondary_title}**, "
+                    f"{pmid}\n"
+                    )
+            #st.markdown(response_str.strip(), unsafe_allow_html=True)
+
+            return response_str.strip()
+        else:
+            return result
+    
     
      # --- 3. Web search intent ---
     try:
@@ -287,5 +340,9 @@ if question is not None and question !="":
     
     with st.chat_message("ai"):
         ai_response = agent_router(question, st.session_state.chat_history)
+        
+    
+    with st.chat_message("ai"):
         st.markdown(ai_response)
+    
     st.session_state.chat_history.append(AIMessage(ai_response))
