@@ -1,6 +1,6 @@
 def example_scripts():
     examples = [
-        {"question": "List all publications", "query": "SELECT author,title,accession_number as PMID FROM refs ORDER BY ID DESC;",},
+        {"question": "List all publications", "query": "SELECT author,title,accession_number as PMID FROM refs ORDER BY ID DESC LIMIT;",},
 
         {"question": "List all publications published between the months of January and June in the year 2025",
         "query":"SELECT author,title, accession_number as PMID FROM refs WHERE YEAR = 2025 AND MONTH(STR_TO_DATE(edition, '%Y/%m/%d')) BETWEEN 1 AND 6;",
@@ -77,6 +77,9 @@ def example_scripts():
         },
         {"question": "List all publications were published by biosciences department in 2025",
         "query":"SELECT DISTINCT author,title,accession_number as PMID FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id INNER JOIN people_department ON people.id = people_department.id WHERE people_department.dept_id = 1 AND YEAR(STR_TO_DATE(edition, '%Y/%m/%d')) = 2025 ORDER BY accession_number DESC"
+        },
+        {"question": "List all publications published by HSRE department in the year 2025",
+        "query":"SELECT DISTINCT author, title, accession_number as PMID FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id INNER JOIN people_department ON people.id = people_department.id WHERE people_department.dept_id = 5 AND YEAR(STR_TO_DATE(edition, '%Y/%m/%d')) = 2025 ORDER BY accession_number DESC"
         }
     ]
     return examples

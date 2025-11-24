@@ -112,7 +112,7 @@ def export_to_excel(data, filename="output.xlsx"):
     
     df = pd.DataFrame(all_entries)
     df.to_excel(filename, index=False)
-    print("Successfully created an excel file named: {filename}")
+    print(f"Successfully created an excel file named: {filename}")
     return filename
 
 
@@ -288,11 +288,15 @@ def agent_router(question: str, result):
 
             for i, (authors,title,pmid) in enumerate(result_list, start=1):
                 response_str += (
-                    f"{i}. {authors}, {title}, "
+                    f"{i}. {authors},{title}, "
                     
                     f"{pmid}\n"
                     )
             #st.markdown(response_str.strip(), unsafe_allow_html=True)
+            st.session_state["last_data_for_excel"] = final_data
+            #response_str += "\n\nWould you like to download this list as an Excel file? (yes/no)"
+            response_str += '\n\n<span style="color: green; font-weight: bold;">Would you like to download this list as an Excel file? (yes/no)</span>'
+
 
             return response_str.strip()
         else:
@@ -331,18 +335,39 @@ for message in st.session_state.chat_history:
         with st.chat_message("ai"):
             st.markdown(message.content)
 
-
 question = st.chat_input("Ask a question")
-if question is not None and question !="":
+if question is not None and question != "":
     st.session_state.chat_history.append(HumanMessage(question))
     with st.chat_message("human"):
         st.markdown(question)
-    
+
+    # --- Intercept YES/NO for Excel download if a list was previously generated ---
+    if "last_data_for_excel" in st.session_state:
+        user_answer = question.lower().strip()
+        if user_answer in ["yes", "y"]:
+            filepath = export_to_excel(st.session_state["last_data_for_excel"])
+            if filepath:
+        # Read the Excel file as bytes
+                with open(filepath, "rb") as f:
+                    excel_bytes = f.read()
+                st.download_button(
+                    label="Click here to download your Excel file",
+                    data=excel_bytes,
+                    file_name=filepath,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+        else:
+            st.markdown("No valid data available to export.")
+        del st.session_state["last_data_for_excel"]
+        st.stop()
+
+    # --- Normal agent processing ---
     with st.chat_message("ai"):
         ai_response = agent_router(question, st.session_state.chat_history)
-        
-    
+
     with st.chat_message("ai"):
-        st.markdown(ai_response)
+        #st.markdown(ai_response)
+        st.markdown(ai_response, unsafe_allow_html=True)
     
     st.session_state.chat_history.append(AIMessage(ai_response))
+
