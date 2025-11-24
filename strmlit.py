@@ -286,10 +286,10 @@ def agent_router(question: str, result):
             result_list = ast.literal_eval(result_str)
             response_str = ""
 
-            for i, (authors,year,title,secondary_title, pmid) in enumerate(result_list, start=1):
+            for i, (authors,title,pmid) in enumerate(result_list, start=1):
                 response_str += (
-                    f"{i}. {authors}, {year}, {title}, "
-                    f"**{secondary_title}**, "
+                    f"{i}. {authors}, {title}, "
+                    
                     f"{pmid}\n"
                     )
             #st.markdown(response_str.strip(), unsafe_allow_html=True)
