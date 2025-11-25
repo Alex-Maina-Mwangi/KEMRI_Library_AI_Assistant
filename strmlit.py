@@ -100,14 +100,19 @@ def export_to_excel(data, filename="output.xlsx"):
         except(SyntaxError,ValueError):
             parsed_results = []
     
-    for author,year,title,pmid,secondary_title in parsed_results:
+    for author,year,title,secondary_title,volume,number,pages,pmid,doi in parsed_results:
         all_entries.append({
             "Authors": author,
             "Year": year,
             "Title": title,
+            "Journal_title": secondary_title,
+            "Volume": volume,
+            "Issue": number,
+            "Pages": pages,
             "PMID": pmid,
-            "Journal Title": secondary_title
+            "DOI": doi
         })
+        
     if not all_entries:
         print("No valid Entries")
         return None
@@ -288,8 +293,8 @@ def agent_router(question: str, result):
             result_list = ast.literal_eval(result_str)
             response_str = ""
 
-            for i, (authors,year,title,pmid,secondary_title) in enumerate(result_list, start=1):
-                response_str += (f"{i}. {authors},{year},{title}, {pmid}, {secondary_title}\n")
+            for i, (authors,year,title,secondary_title,volume,number,pages,pmid,doi) in enumerate(result_list, start=1):
+                response_str += (f"{i}. {authors},{year},{title},{secondary_title},{volume},{number},{pages},{pmid},{doi} \n")
             #st.markdown(response_str.strip(), unsafe_allow_html=True)
             st.session_state["last_data_for_excel"] = final_data
             #response_str += "\n\nWould you like to download this list as an Excel file? (yes/no)"
