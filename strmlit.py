@@ -29,7 +29,7 @@ db = SQLDatabase.from_uri(db_uri)
 schema_text = db.get_context()["table_info"]
 
 #set-up llm
-llm = ChatMistralAI(api_key=api_key, model="open-mistral-7b", max_tokens=4096, temperature=0.0)
+llm = ChatMistralAI(api_key=api_key, model="mistral-small-latest", max_tokens=4096, temperature=0.0)
 
 #sql prompt
 example_prompt = PromptTemplate.from_template("Question:{question}\nQuery:{query}\n")
@@ -100,11 +100,13 @@ def export_to_excel(data, filename="output.xlsx"):
         except(SyntaxError,ValueError):
             parsed_results = []
     
-    for author,title,pmid in parsed_results:
+    for author,year,title,pmid,secondary_title in parsed_results:
         all_entries.append({
             "Authors": author,
+            "Year": year,
             "Title": title,
-            "PMID": pmid
+            "PMID": pmid,
+            "Journal Title": secondary_title
         })
     if not all_entries:
         print("No valid Entries")
@@ -286,12 +288,8 @@ def agent_router(question: str, result):
             result_list = ast.literal_eval(result_str)
             response_str = ""
 
-            for i, (authors,title,pmid) in enumerate(result_list, start=1):
-                response_str += (
-                    f"{i}. {authors},{title}, "
-                    
-                    f"{pmid}\n"
-                    )
+            for i, (authors,year,title,pmid,secondary_title) in enumerate(result_list, start=1):
+                response_str += (f"{i}. {authors},{year},{title}, {pmid}, {secondary_title}\n")
             #st.markdown(response_str.strip(), unsafe_allow_html=True)
             st.session_state["last_data_for_excel"] = final_data
             #response_str += "\n\nWould you like to download this list as an Excel file? (yes/no)"
