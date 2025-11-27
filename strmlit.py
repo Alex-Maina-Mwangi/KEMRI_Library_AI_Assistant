@@ -7,7 +7,7 @@ from langchain_core.output_parsers import StrOutputParser
 
 
 from dotenv import load_dotenv
-import os,ast
+import os,ast,re
 import pandas as pd
 import streamlit as st
 from langchain_core.messages import AIMessage,HumanMessage
@@ -100,18 +100,18 @@ def export_to_excel(data, filename="output.xlsx"):
         except(SyntaxError,ValueError):
             parsed_results = []
     
-    for author,year,title,secondary_title,volume,number,pages,pmid,doi in parsed_results:
-        all_entries.append({
-            "Authors": author,
-            "Year": year,
-            "Title": title,
-            "Journal_title": secondary_title,
-            "Volume": volume,
-            "Issue": number,
-            "Pages": pages,
-            "PMID": pmid,
-            "DOI": doi
-        })
+        for author,year,title,secondary_title,volume,number,pages,pmid,doi in parsed_results:
+            all_entries.append({
+                "Authors": author,
+                "Year": year,
+                "Title": title,
+                "Journal_title": secondary_title,
+                "Volume": volume,
+                "Issue": number,
+                "Pages": pages,
+                "PMID": pmid,
+                "DOI": doi
+            })
         
     if not all_entries:
         print("No valid Entries")
@@ -181,27 +181,56 @@ Do not include any explanations, examples, or SQL statements.
 
 
 def list_results(question: str, schema: str):
-    chain = (RunnablePassthrough.assign(schema = lambda x: x["schema"])
+    # Use runnables to generate SQL and retrieve full results
+    chain = (RunnablePassthrough.assign(schema=lambda x: x["schema"])
              | sql_chain
              | RunnableLambda(lambda sql: {"sql": sql})
              | RunnableLambda(lambda x: {
-                 "question": question,
-                 "sql": x["sql"],
-                 "result": run_query(x["sql"])["result"]
+                    "question": question,
+                    "sql": x["sql"],
+                    "result": run_query(x["sql"])["result"]   # FULL results here
              })
              | RunnablePassthrough.assign(
-                 question = lambda x: x["question"],
-                 sql = lambda x: x["sql"],
-                 result = lambda x: x["result"]
+                    question=lambda x: x["question"],
+                    sql=lambda x: x["sql"],
+                    result=lambda x: x["result"]
              )
-             | response_prompt
-             | llm
-             | StrOutputParser()
              )
-    response_text = chain.invoke({"question": question, "schema": schema})
-    sql = sql_chain.invoke({"question": question, "schema": schema_text})
-    data = run_query(sql)["result"]
-    return {"response": response_text, "data": data }
+
+    intermediate = chain.invoke({"question": question, "schema": schema})
+
+    sql = intermediate["sql"]
+    full_data = intermediate["result"]   # all rows
+
+    # --- Build preview of ONLY first 50 ---
+    preview_data = full_data.copy()
+
+    try:
+        raw_list = ast.literal_eval(preview_data[0]["Result"])
+        preview_list = raw_list[:50]            # keep only first 50
+        preview_data[0]["Result"] = str(preview_list)
+    except Exception:
+        preview_data = full_data   # fallback
+
+    # --- Remove any LIMIT clauses for full data ---
+    clean_sql = re.sub(r"limit\s+\d+", "", sql, flags=re.IGNORECASE).strip()
+    clean_sql = clean_sql.rstrip(";")
+    full_results = run_query(clean_sql)
+    full_data = full_results["result"]   # full rows for Excel
+
+    # --- Now render preview through LLM ---
+    prompt_text = response_prompt.format(
+        question=question,
+        sql=sql,
+        result=preview_data     # LLM sees only preview
+    )
+    preview_response = llm.invoke(prompt_text)
+
+    return {
+        "response": preview_response,
+        "preview_data": preview_data,   # used for display
+        "full_data": full_data          # used for Excel
+    }
 
 
 
@@ -266,8 +295,10 @@ def user_feedback(user_reply: str):
 
 search_tool = TavilySearch(max_results=5, tavily_api_key= tavily_key)
 
-def agent_router(question: str, result):
+def agent_router(question: str, chat_history):
     q_lower = question.lower().strip()
+
+    # --- 1. Greetings ---
     greetings = {
         "niaje": "Poa sana! Naweza sort issue yako gani leo? Mi nimeiva story za publications ile deadly",
         "sasa": "Fiti sana! Naweza sort issue yako gani leo? Mi nimeiva story za publications ile deadly",
@@ -279,38 +310,59 @@ def agent_router(question: str, result):
     }
     if q_lower in greetings:
         return greetings[q_lower]
-    
-    #DB Search
-   
+
+    # --- 2. Database search intent ---
     db_keywords = ["publication", "article", "paper", "author", "journal"]
     if any(word in q_lower for word in db_keywords):
-        # Call your full_chain for DB queries
+        # Run full_chain to detect intent (list or count)
         result = full_chain(question, schema_text)
-        if isinstance(result,dict):
-            final_data = result.get("data")
-            result_str = final_data[0]["Result"]
-            # safely convert string → Python list
-            result_list = ast.literal_eval(result_str)
-            response_str = ""
 
-            for i, (authors,year,title,secondary_title,volume,number,pages,pmid,doi) in enumerate(result_list, start=1):
-                response_str += (f"{i}. {authors},{year},{title},{secondary_title},{volume},{number},{pages},{pmid},{doi} \n")
-            #st.markdown(response_str.strip(), unsafe_allow_html=True)
-            st.session_state["last_data_for_excel"] = final_data
-            #response_str += "\n\nWould you like to download this list as an Excel file? (yes/no)"
-            response_str += '\n\n<span style="color: green; font-weight: bold;">Would you like to download this list as an Excel file? (yes/no)</span>'
+        if isinstance(result, dict):
+            # If the result contains preview_data, it's a list query
+            preview_data = result.get("preview_data")
+            full_data = result.get("full_data")
+            response = result.get("response")
 
+            # Only show Excel prompt if it's a **list** query
+            if preview_data is not None and full_data is not None:
+                try:
+                    preview_list = ast.literal_eval(preview_data[0]["Result"])
+                except Exception:
+                    preview_list = preview_data
 
-            return response_str.strip()
+                # Total count
+                try:
+                    full_list = ast.literal_eval(full_data[0]["Result"])
+                    total_count = len(full_list)
+                except Exception:
+                    total_count = len(preview_list)
+
+                # Build response string
+                response_str = f"Showing 50 of {total_count} results. Download Excel for the full list below.\n\n"
+                for i, (authors, year, title, secondary_title, volume, number, pages, pmid, doi) in enumerate(preview_list, start=1):
+                    response_str += f"{i}. {authors},{year},{title},{secondary_title},{volume},{number},{pages},{pmid},{doi}\n"
+
+                # Add Excel download prompt
+                response_str += '\n<span style="color: green; font-weight: bold;">Would you like to download this list as an Excel file? (yes/no)</span>'
+                st.markdown(response_str, unsafe_allow_html=True)
+
+                #
+                # Save only **list data** for Excel download
+                st.session_state["last_data_for_excel"] = full_data
+
+                return response_str
+
+            else:
+                # Count queries or other queries do NOT trigger Excel download
+                return response or "No results found."
+
         else:
             return result
-    
-    
-     # --- 3. Web search intent ---
+
+    # --- 3. Web search fallback ---
     try:
         results = search_tool.invoke(question)
         if results and "results" in results and len(results["results"]) > 0:
-            # Use the first result's content as context
             context = results["results"][0]["content"]
             prompt = f"Question: {question}\nContext: {context}\nAnswer concisely in 100 words or less."
             return llm.invoke(prompt).content
@@ -320,7 +372,8 @@ def agent_router(question: str, result):
         return f"Web search failed: {str(e)}"
 
     # --- 4. Fallback ---
-    return "Sorry, I don't understand your question. Please rephrase"
+    return "Sorry, I don't understand your question. Please rephrase."
+
 
 st.set_page_config(page_title = "Kadzo", page_icon= ":shark:")
 if "chat_history" not in st.session_state:
@@ -371,6 +424,7 @@ if question is not None and question != "":
     with st.chat_message("ai"):
         #st.markdown(ai_response)
         st.markdown(ai_response, unsafe_allow_html=True)
+        
     
     st.session_state.chat_history.append(AIMessage(ai_response))
 
