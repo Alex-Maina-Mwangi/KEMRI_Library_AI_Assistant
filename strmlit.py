@@ -344,7 +344,7 @@ def agent_router(question: str, chat_history):
 
                 # Add Excel download prompt
                 response_str += '\n<span style="color: green; font-weight: bold;">Would you like to download this list as an Excel file? (yes/no)</span>'
-                st.markdown(response_str, unsafe_allow_html=True)
+                #st.markdown(response_str, unsafe_allow_html=True)
 
                 #
                 # Save only **list data** for Excel download
