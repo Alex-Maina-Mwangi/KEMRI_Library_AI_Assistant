@@ -325,10 +325,21 @@ def agent_router(question: str, chat_history):
 
             # Only show Excel prompt if it's a **list** query
             if preview_data is not None and full_data is not None:
+                #try:
+                #    preview_list = ast.literal_eval(preview_data[0]["Result"])
+                #except Exception:
+                #    preview_list = preview_data
+                # --- Safely extract preview_list ---
                 try:
-                    preview_list = ast.literal_eval(preview_data[0]["Result"])
+                    raw = preview_data[0].get("Result", "")
+                    preview_list = ast.literal_eval(raw) if raw else []
                 except Exception:
-                    preview_list = preview_data
+                    preview_list = []
+
+
+                # --- Handle ZERO results early ---
+                if not preview_list:
+                    return "No results found."
 
                 # Total count
                 try:
@@ -338,6 +349,7 @@ def agent_router(question: str, chat_history):
                     total_count = len(preview_list)
 
                 # Build response string
+                st.write("DEBUG preview_list:", preview_list[:5])
                 response_str = f"Showing 50 of {total_count} results. Download Excel for the full list below.\n\n"
                 for i, (authors, year, title, secondary_title, volume, number, pages, pmid, doi) in enumerate(preview_list, start=1):
                     response_str += f"{i}. {authors},{year},{title},{secondary_title},{volume},{number},{pages},{pmid},{doi}\n"
