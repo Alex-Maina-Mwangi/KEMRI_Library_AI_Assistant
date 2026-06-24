@@ -349,7 +349,7 @@ def agent_router(question: str, chat_history):
                     total_count = len(preview_list)
 
                 # Build response string
-                st.write("DEBUG preview_list:", preview_list[:5])
+                #st.write("DEBUG preview_list:", preview_list[:5])
                 response_str = f"Showing 50 of {total_count} results. Download Excel for the full list below.\n\n"
                 for i, (authors, year, title, secondary_title, volume, number, pages, pmid, doi) in enumerate(preview_list, start=1):
                     response_str += f"{i}. {authors},{year},{title},{secondary_title},{volume},{number},{pages},{pmid},{doi}\n"
