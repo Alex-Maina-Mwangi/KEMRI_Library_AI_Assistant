@@ -1,652 +1,91 @@
 def example_scripts():
     examples = [
+        {"question": "List all publications", "query": "SELECT author, year, title, secondary_title, volume, number, pages, accession_number as PMID, electronic_resource_number as doi FROM refs ORDER BY ID DESC LIMIT;",},
 
-        # ============================================================
-        # GENERAL PUBLICATIONS
-        # ============================================================
-
-        {
-            "question": "List all publications",
-            "query": """
-                SELECT
-                    author,
-                    year,
-                    title,
-                    secondary_title,
-                    volume,
-                    number,
-                    pages,
-                    accession_number AS PMID,
-                    electronic_resource_number AS doi
-                FROM refs
-                ORDER BY id DESC
-                LIMIT 100;
-            """
+        {"question": "List all publications published between the months of January and June in the year 2025",
+        #"query":"SELECT author,year,title,secondary_title, volume, number, pages,accession_number as PMID, electronic_resource_number as doi FROM refs WHERE YEAR = 2025 AND MONTH(STR_TO_DATE(edition, '%Y/%m/%d')) BETWEEN 1 AND 6;",
+        "query":"SELECT author,year,title,secondary_title,volume,number,pages,accession_number AS PMID,electronic_resource_number AS doi FROM refs WHERE YEAR(CASE WHEN edition LIKE '%/%'THEN STR_TO_DATE(edition, '%Y/%m/%d') ELSE STR_TO_DATE(edition, '%Y%m%d') END) = 2025 AND MONTH(CASE WHEN edition LIKE '%/%' THEN STR_TO_DATE(edition, '%Y/%m/%d') ELSE STR_TO_DATE(edition, '%Y%m%d') END) BETWEEN 1 AND 6;",
+        }, 
+        {"question": "How many publications published between the months of January and June in the year 2025",
+        #"query":"SELECT COUNT(*) FROM refs WHERE YEAR = 2025 AND MONTH(STR_TO_DATE(edition, '%Y/%m/%d')) BETWEEN 1 AND 6;",
+        "query": "SELECT COUNT(*) FROM (SELECT CASE WHEN edition LIKE '%/%' THEN STR_TO_DATE(edition, '%Y/%m/%d') ELSE STR_TO_DATE(edition, '%Y%m%d') END AS pub_date FROM refs ) t WHERE YEAR(pub_date) = 2025 AND MONTH(pub_date) BETWEEN 1 AND 6;",
+        }, 
+        {"question": "What is the total number of publications published by Philip Bejon between the months of January and June in the year 2025",
+        "query":"SELECT COUNT(DISTINCT refs.id) FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE authorname LIKE '%Bejon P%' AND YEAR = 2025 AND MONTH(STR_TO_DATE(edition, '%Y/%m/%d')) BETWEEN 1 AND 6;",
+        
         },
 
-        {
-            "question": "How many publications are there",
-            "query": """
-                SELECT COUNT(*) AS total_publications
-                FROM refs;
-            """
+        {"question": "What is the total number of publications published by biosciences department",
+        "query": "SELECT COUNT(DISTINCT refs.id) FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id INNER JOIN people_department ON people.id = people_department.id WHERE people_department.dept_id = 1;",
+        },
+        {"question": "What is the total number of publications published by Epidemiology and Demography EDD department",
+        "query": "SELECT COUNT(DISTINCT refs.id) FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id INNER JOIN people_department ON people.id = people_department.id WHERE people_department.dept_id = 4;",
         },
 
-
-        # ============================================================
-        # PUBLICATIONS BY DATE RANGE
-        # ============================================================
-
-        {
-            "question": "List all publications published between January and June 2025",
-            "query": """
-                SELECT
-                    author,
-                    year,
-                    title,
-                    secondary_title,
-                    volume,
-                    number,
-                    pages,
-                    accession_number AS PMID,
-                    electronic_resource_number AS doi
-                FROM (
-                    SELECT
-                        refs.*,
-                        CASE
-                            WHEN edition LIKE '%/%'
-                                THEN STR_TO_DATE(edition, '%Y/%m/%d')
-                            ELSE
-                                STR_TO_DATE(edition, '%Y%m%d')
-                        END AS pub_date
-                    FROM refs
-                ) r
-                WHERE YEAR(pub_date) = 2025
-                  AND MONTH(pub_date) BETWEEN 1 AND 6
-                ORDER BY id DESC;
-            """
+        {"question": "What is the total number of publications published by Health Sysytems and Research Ethics HSRE department",
+        "query": "SELECT COUNT(DISTINCT refs.id) FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id INNER JOIN people_department ON people.id = people_department.id WHERE people_department.dept_id = 5;",
         },
 
-        {
-            "question": "How many publications were published between January and June 2025",
-            "query": """
-                SELECT COUNT(*) AS total_publications
-                FROM (
-                    SELECT
-                        CASE
-                            WHEN edition LIKE '%/%'
-                                THEN STR_TO_DATE(edition, '%Y/%m/%d')
-                            ELSE
-                                STR_TO_DATE(edition, '%Y%m%d')
-                        END AS pub_date
-                    FROM refs
-                ) r
-                WHERE YEAR(pub_date) = 2025
-                  AND MONTH(pub_date) BETWEEN 1 AND 6;
-            """
+        {"question": "What is the total number publications published by Faith Osier",
+        "query": "SELECT COUNT(DISTINCT refs.id) FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE people.authorname LIKE '%Osier F%';",
         },
-
-
-        # ============================================================
-        # PUBLICATIONS BY YEAR
-        # ============================================================
-
-        {
-            "question": "How many publications were published in 2025",
-            "query": """
-                SELECT COUNT(*) AS total_publications
-                FROM (
-                    SELECT
-                        CASE
-                            WHEN edition LIKE '%/%'
-                                THEN STR_TO_DATE(edition, '%Y/%m/%d')
-                            ELSE
-                                STR_TO_DATE(edition, '%Y%m%d')
-                        END AS pub_date
-                    FROM refs
-                ) r
-                WHERE YEAR(pub_date) = 2025;
-            """
+        {"question": "list all publications published by Faith Osier",
+        "query": "SELECT author, year, title, secondary_title, volume, number, pages, accession_number as PMID, electronic_resource_number as doi FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE people.authorname LIKE '%Osier F%' ORDER BY refs.id DESC;",
+    
         },
-
-        {
-            "question": "List all publications published in 2025",
-            "query": """
-                SELECT
-                    author,
-                    year,
-                    title,
-                    secondary_title,
-                    volume,
-                    number,
-                    pages,
-                    accession_number AS PMID,
-                    electronic_resource_number AS doi
-                FROM (
-                    SELECT
-                        refs.*,
-                        CASE
-                            WHEN edition LIKE '%/%'
-                                THEN STR_TO_DATE(edition, '%Y/%m/%d')
-                            ELSE
-                                STR_TO_DATE(edition, '%Y%m%d')
-                        END AS pub_date
-                    FROM refs
-                ) r
-                WHERE YEAR(pub_date) = 2025
-                ORDER BY id DESC;
-            """
+        
+        {"question": "How many publications have been published by Emelda Okiro",
+        "query": "SELECT COUNT(DISTINCT refs.id) FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE people.authorname LIKE '%Okiro E%';",
         },
-
-
-        # ============================================================
-        # AUTHOR - COUNTS
-        # ============================================================
-
-        {
-            "question": "How many publications has Philip Bejon published",
-            "query": """
-                SELECT COUNT(DISTINCT refs.id) AS total_publications
-                FROM refs
-                INNER JOIN author_publication1
-                    ON refs.id = author_publication1.rid
-                INNER JOIN author_alias
-                    ON author_publication1.auid = author_alias.auid
-                INNER JOIN people
-                    ON author_alias.pid = people.id
-                WHERE people.authorname LIKE '%Bejon P%';
-            """
+        {"question": "How many articles has Mike English published",
+        "query": "SELECT COUNT(DISTINCT refs.id) FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE people.authorname LIKE '%English M%';",	
         },
-
-        {
-            "question": "How many publications has Edwine Barasa published",
-            "query": """
-                SELECT COUNT(DISTINCT refs.id) AS total_publications
-                FROM refs
-                INNER JOIN author_publication1
-                    ON refs.id = author_publication1.rid
-                INNER JOIN author_alias
-                    ON author_publication1.auid = author_alias.auid
-                INNER JOIN people
-                    ON author_alias.pid = people.id
-                WHERE people.authorname LIKE '%Barasa E%';
-            """
+        {"question": "What is the total number of articles published by Jay Berkley",
+         "query": "SELECT COUNT(DISTINCT refs.id) FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE people.authorname LIKE '%Berkley J%';",
         },
-
-        {
-            "question": "How many publications has Faith Osier published",
-            "query": """
-                SELECT COUNT(DISTINCT refs.id) AS total_publications
-                FROM refs
-                INNER JOIN author_publication1
-                    ON refs.id = author_publication1.rid
-                INNER JOIN author_alias
-                    ON author_publication1.auid = author_alias.auid
-                INNER JOIN people
-                    ON author_alias.pid = people.id
-                WHERE people.authorname LIKE '%Osier F%';
-            """
+        {"question":"What is the total number of articles published by Edwine Barasa",
+         "query": "SELECT COUNT(DISTINCT refs.id) FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE people.authorname LIKE '%Barasa E%';",
+         
         },
-
-        {
-            "question": "How many publications has Mike English published",
-            "query": """
-                SELECT COUNT(DISTINCT refs.id) AS total_publications
-                FROM refs
-                INNER JOIN author_publication1
-                    ON refs.id = author_publication1.rid
-                INNER JOIN author_alias
-                    ON author_publication1.auid = author_alias.auid
-                INNER JOIN people
-                    ON author_alias.pid = people.id
-                WHERE people.authorname LIKE '%English M%';
-            """
+        {"question": "List all publications published by Philip Bejon between the months of January and June in the year 2025",
+        #"query":"SELECT author, year, title, secondary_title, volume, number, pages, accession_number as PMID, electronic_resource_number as doi FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE authorname LIKE '%Bejon P%' AND YEAR = 2025 AND MONTH(STR_TO_DATE(edition, '%Y/%m/%d')) BETWEEN 1 AND 6;",
+        "query": "SELECT author,year,title, secondary_title, volume, number, pages, accession_number AS PMID, electronic_resource_number AS doi FROM (SELECT refs.*, CASE WHEN edition LIKE '%/%' THEN STR_TO_DATE(edition, '%Y/%m/%d')ELSE STR_TO_DATE(edition, '%Y%m%d') END AS pub_date FROM refs) r INNER JOIN author_publication1 ON r.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE people.authorname LIKE '%Bejon P%' AND YEAR(pub_date) = 2025 AND MONTH(pub_date) BETWEEN 1 AND 6 ORDER BY r.id DESC;",
         },
-
-        {
-            "question": "How many publications has Jay Berkley published",
-            "query": """
-                SELECT COUNT(DISTINCT refs.id) AS total_publications
-                FROM refs
-                INNER JOIN author_publication1
-                    ON refs.id = author_publication1.rid
-                INNER JOIN author_alias
-                    ON author_publication1.auid = author_alias.auid
-                INNER JOIN people
-                    ON author_alias.pid = people.id
-                WHERE people.authorname LIKE '%Berkley J%';
-            """
+        
+        {"question":"List all articles published by Edwine Barasa",
+         "query": "SELECT author, year, title, secondary_title, volume, number, pages, accession_number as PMID, electronic_resource_number as doi FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE people.authorname LIKE '%Barasa E%';",
         },
-
-        {
-            "question": "How many publications has Emelda Okiro published",
-            "query": """
-                SELECT COUNT(DISTINCT refs.id) AS total_publications
-                FROM refs
-                INNER JOIN author_publication1
-                    ON refs.id = author_publication1.rid
-                INNER JOIN author_alias
-                    ON author_publication1.auid = author_alias.auid
-                INNER JOIN people
-                    ON author_alias.pid = people.id
-                WHERE people.authorname LIKE '%Okiro E%';
-            """
+        {"question":"List all publications published by Edwine Barasa",
+         "query": "SELECT author, year, title, secondary_title, volume, number, pages, accession_number as PMID, electronic_resource_number as doi FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE people.authorname LIKE '%Barasa E%' ORDER BY refs.id DESC;",
         },
-
-
-        # ============================================================
-        # AUTHOR - LIST PUBLICATIONS
-        # ============================================================
-
-        {
-            "question": "List all publications published by Philip Bejon",
-            "query": """
-                SELECT
-                    author,
-                    year,
-                    title,
-                    secondary_title,
-                    volume,
-                    number,
-                    pages,
-                    accession_number AS PMID,
-                    electronic_resource_number AS doi
-                FROM refs
-                INNER JOIN author_publication1
-                    ON refs.id = author_publication1.rid
-                INNER JOIN author_alias
-                    ON author_publication1.auid = author_alias.auid
-                INNER JOIN people
-                    ON author_alias.pid = people.id
-                WHERE people.authorname LIKE '%Bejon P%'
-                ORDER BY refs.id DESC;
-            """
+        {"question":"List all papers published by Edwine Barasa",
+         "query": "SELECT author, year, title, secondary_title, volume, number, pages, accession_number as PMID, electronic_resource_number as doi FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE people.authorname LIKE '%Barasa E%' ORDER BY refs.id DESC;",
         },
-
-        {
-            "question": "List all publications published by Edwine Barasa",
-            "query": """
-                SELECT
-                    author,
-                    year,
-                    title,
-                    secondary_title,
-                    volume,
-                    number,
-                    pages,
-                    accession_number AS PMID,
-                    electronic_resource_number AS doi
-                FROM refs
-                INNER JOIN author_publication1
-                    ON refs.id = author_publication1.rid
-                INNER JOIN author_alias
-                    ON author_publication1.auid = author_alias.auid
-                INNER JOIN people
-                    ON author_alias.pid = people.id
-                WHERE people.authorname LIKE '%Barasa E%'
-                ORDER BY refs.id DESC;
-            """
+        {"question":"List all papers published by Philip Bejon",
+         "query": "SELECT author, year, title, secondary_title, volume, number, pages, accession_number as PMID, electronic_resource_number as doi FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE people.authorname LIKE '%Bejon P%' ORDER BY refs.id DESC;",
         },
-
-        {
-            "question": "List all publications published by Faith Osier",
-            "query": """
-                SELECT
-                    author,
-                    year,
-                    title,
-                    secondary_title,
-                    volume,
-                    number,
-                    pages,
-                    accession_number AS PMID,
-                    electronic_resource_number AS doi
-                FROM refs
-                INNER JOIN author_publication1
-                    ON refs.id = author_publication1.rid
-                INNER JOIN author_alias
-                    ON author_publication1.auid = author_alias.auid
-                INNER JOIN people
-                    ON author_alias.pid = people.id
-                WHERE people.authorname LIKE '%Osier F%'
-                ORDER BY refs.id DESC;
-            """
+        
+        {"question":"List all articles published by Sophie Uyoga",
+         "query": "SELECT author, year, title, secondary_title, volume, number, pages, accession_number as PMID, electronic_resource_number as doi FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE people.authorname LIKE '%Uyoga S%' ORDER BY refs.id DESC",
         },
-
-        {
-            "question": "List all publications published by Sophie Uyoga",
-            "query": """
-                SELECT
-                    author,
-                    year,
-                    title,
-                    secondary_title,
-                    volume,
-                    number,
-                    pages,
-                    accession_number AS PMID,
-                    electronic_resource_number AS doi
-                FROM refs
-                INNER JOIN author_publication1
-                    ON refs.id = author_publication1.rid
-                INNER JOIN author_alias
-                    ON author_publication1.auid = author_alias.auid
-                INNER JOIN people
-                    ON author_alias.pid = people.id
-                WHERE people.authorname LIKE '%Uyoga S%'
-                ORDER BY refs.id DESC;
-            """
+        {"question":"List all articles published by Anthony Etyang",
+         "query": "SELECT author, year, title, secondary_title, volume, number, pages, accession_number as PMID, electronic_resource_number as doi FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE people.authorname LIKE '%Etyang A%' ORDER BY refs.id DESC",
         },
-
-        {
-            "question": "List all publications published by Anthony Etyang",
-            "query": """
-                SELECT
-                    author,
-                    year,
-                    title,
-                    secondary_title,
-                    volume,
-                    number,
-                    pages,
-                    accession_number AS PMID,
-                    electronic_resource_number AS doi
-                FROM refs
-                INNER JOIN author_publication1
-                    ON refs.id = author_publication1.rid
-                INNER JOIN author_alias
-                    ON author_publication1.auid = author_alias.auid
-                INNER JOIN people
-                    ON author_alias.pid = people.id
-                WHERE people.authorname LIKE '%Etyang A%'
-                ORDER BY refs.id DESC;
-            """
+        {"question":"List all articles published by Philip Bejon",
+         "query": "SELECT author, year, title, secondary_title, volume, number, pages, accession_number as PMID, electronic_resource_number as doi FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE people.authorname LIKE '%Bejon P%' ORDER BY refs.id DESC",
         },
-
-
-        # ============================================================
-        # AUTHOR + YEAR
-        # ============================================================
-
-        {
-            "question": "List all publications published by Philip Bejon in 2025",
-            "query": """
-                SELECT
-                    author,
-                    year,
-                    title,
-                    secondary_title,
-                    volume,
-                    number,
-                    pages,
-                    accession_number AS PMID,
-                    electronic_resource_number AS doi
-                FROM (
-                    SELECT
-                        refs.*,
-                        CASE
-                            WHEN edition LIKE '%/%'
-                                THEN STR_TO_DATE(edition, '%Y/%m/%d')
-                            ELSE
-                                STR_TO_DATE(edition, '%Y%m%d')
-                        END AS pub_date
-                    FROM refs
-                ) r
-                INNER JOIN author_publication1
-                    ON r.id = author_publication1.rid
-                INNER JOIN author_alias
-                    ON author_publication1.auid = author_alias.auid
-                INNER JOIN people
-                    ON author_alias.pid = people.id
-                WHERE people.authorname LIKE '%Bejon P%'
-                  AND YEAR(pub_date) = 2025
-                ORDER BY r.id DESC;
-            """
+        {"question": "List all articles published by Philip Bejon in the year 2025",
+         #"query": "SELECT author, year, title, secondary_title, volume, number, pages, accession_number as PMID, electronic_resource_number as doi FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE people.authorname LIKE '%Bejon P%' AND YEAR(STR_TO_DATE(edition, '%Y/%m/%d')) = 2025 ORDER BY refs.id DESC",
+        "query": "SELECT author,year,title, secondary_title, volume, number, pages, accession_number AS PMID, electronic_resource_number AS doi FROM (SELECT refs.*, CASE WHEN edition LIKE '%/%' THEN STR_TO_DATE(edition, '%Y/%m/%d')ELSE STR_TO_DATE(edition, '%Y%m%d') END AS pub_date FROM refs) r INNER JOIN author_publication1 ON r.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id WHERE people.authorname LIKE '%Bejon P%' AND YEAR(pub_date) = 2025;",
         },
-
-
-        # ============================================================
-        # AUTHOR + DATE RANGE
-        # ============================================================
-
-        {
-            "question": "How many publications did Philip Bejon publish between January and June 2025",
-            "query": """
-                SELECT COUNT(DISTINCT r.id) AS total_publications
-                FROM (
-                    SELECT
-                        refs.*,
-                        CASE
-                            WHEN edition LIKE '%/%'
-                                THEN STR_TO_DATE(edition, '%Y/%m/%d')
-                            ELSE
-                                STR_TO_DATE(edition, '%Y%m%d')
-                        END AS pub_date
-                    FROM refs
-                ) r
-                INNER JOIN author_publication1
-                    ON r.id = author_publication1.rid
-                INNER JOIN author_alias
-                    ON author_publication1.auid = author_alias.auid
-                INNER JOIN people
-                    ON author_alias.pid = people.id
-                WHERE people.authorname LIKE '%Bejon P%'
-                  AND YEAR(r.pub_date) = 2025
-                  AND MONTH(r.pub_date) BETWEEN 1 AND 6;
-            """
+        {"question": "List all publications were published by biosciences department in 2025",
+        "query": ";",
+        #"query":"SELECT DISTINCT author, year, title, secondary_title, volume, number, pages, accession_number as PMID, electronic_resource_number as doi FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id INNER JOIN people_department ON people.id = people_department.id WHERE people_department.dept_id = 1 AND YEAR(STR_TO_DATE(edition, '%Y/%m/%d')) = 2025 ORDER BY accession_number DESC;"
+        "query": "SELECT DISTINCT author, year, title, secondary_title, volume, number, pages, accession_number AS PMID, electronic_resource_number AS doi FROM (SELECT refs.*, CASE WHEN edition LIKE '%/%' THEN STR_TO_DATE(edition, '%Y/%m/%d')ELSE STR_TO_DATE(edition, '%Y%m%d') END AS pub_date FROM refs) r INNER JOIN author_publication1 ON r.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id INNER JOIN people_department ON people.id = people_department.id WHERE people_department.dept_id = 1 AND YEAR(pub_date) = 2025 ORDER BY accession_number DESC;",
         },
-
-        {
-            "question": "List all publications published by Philip Bejon between January and June 2025",
-            "query": """
-                SELECT
-                    r.author,
-                    r.year,
-                    r.title,
-                    r.secondary_title,
-                    r.volume,
-                    r.number,
-                    r.pages,
-                    r.accession_number AS PMID,
-                    r.electronic_resource_number AS doi
-                FROM (
-                    SELECT
-                        refs.*,
-                        CASE
-                            WHEN edition LIKE '%/%'
-                                THEN STR_TO_DATE(edition, '%Y/%m/%d')
-                            ELSE
-                                STR_TO_DATE(edition, '%Y%m%d')
-                        END AS pub_date
-                    FROM refs
-                ) r
-                INNER JOIN author_publication1
-                    ON r.id = author_publication1.rid
-                INNER JOIN author_alias
-                    ON author_publication1.auid = author_alias.auid
-                INNER JOIN people
-                    ON author_alias.pid = people.id
-                WHERE people.authorname LIKE '%Bejon P%'
-                  AND YEAR(r.pub_date) = 2025
-                  AND MONTH(r.pub_date) BETWEEN 1 AND 6
-                ORDER BY r.id DESC;
-            """
-        },
-
-
-        # ============================================================
-        # DEPARTMENT - COUNTS
-        # ============================================================
-
-        {
-            "question": "How many publications have been published by the Biosciences department",
-            "query": """
-                SELECT COUNT(DISTINCT refs.id) AS total_publications
-                FROM refs
-                INNER JOIN author_publication1
-                    ON refs.id = author_publication1.rid
-                INNER JOIN author_alias
-                    ON author_publication1.auid = author_alias.auid
-                INNER JOIN people
-                    ON author_alias.pid = people.id
-                INNER JOIN people_department
-                    ON people.id = people_department.id
-                WHERE people_department.dept_id = 1;
-            """
-        },
-
-        {
-            "question": "How many publications have been published by the Epidemiology and Demography EDD department",
-            "query": """
-                SELECT COUNT(DISTINCT refs.id) AS total_publications
-                FROM refs
-                INNER JOIN author_publication1
-                    ON refs.id = author_publication1.rid
-                INNER JOIN author_alias
-                    ON author_publication1.auid = author_alias.auid
-                INNER JOIN people
-                    ON author_alias.pid = people.id
-                INNER JOIN people_department
-                    ON people.id = people_department.id
-                WHERE people_department.dept_id = 4;
-            """
-        },
-
-        {
-            "question": "How many publications have been published by the Health Systems and Research Ethics HSRE department",
-            "query": """
-                SELECT COUNT(DISTINCT refs.id) AS total_publications
-                FROM refs
-                INNER JOIN author_publication1
-                    ON refs.id = author_publication1.rid
-                INNER JOIN author_alias
-                    ON author_publication1.auid = author_alias.auid
-                INNER JOIN people
-                    ON author_alias.pid = people.id
-                INNER JOIN people_department
-                    ON people.id = people_department.id
-                WHERE people_department.dept_id = 5;
-            """
-        },
-
-
-        # ============================================================
-        # DEPARTMENT + YEAR
-        # ============================================================
-
-        {
-            "question": "List all publications published by the Biosciences department in 2025",
-            "query": """
-                SELECT DISTINCT
-                    r.author,
-                    r.year,
-                    r.title,
-                    r.secondary_title,
-                    r.volume,
-                    r.number,
-                    r.pages,
-                    r.accession_number AS PMID,
-                    r.electronic_resource_number AS doi
-                FROM (
-                    SELECT
-                        refs.*,
-                        CASE
-                            WHEN edition LIKE '%/%'
-                                THEN STR_TO_DATE(edition, '%Y/%m/%d')
-                            ELSE
-                                STR_TO_DATE(edition, '%Y%m%d')
-                        END AS pub_date
-                    FROM refs
-                ) r
-                INNER JOIN author_publication1
-                    ON r.id = author_publication1.rid
-                INNER JOIN author_alias
-                    ON author_publication1.auid = author_alias.auid
-                INNER JOIN people
-                    ON author_alias.pid = people.id
-                INNER JOIN people_department
-                    ON people.id = people_department.id
-                WHERE people_department.dept_id = 1
-                  AND YEAR(r.pub_date) = 2025
-                ORDER BY r.accession_number DESC;
-            """
-        },
-
-        {
-            "question": "List all publications published by the EDD department in 2025",
-            "query": """
-                SELECT DISTINCT
-                    r.author,
-                    r.year,
-                    r.title,
-                    r.secondary_title,
-                    r.volume,
-                    r.number,
-                    r.pages,
-                    r.accession_number AS PMID,
-                    r.electronic_resource_number AS doi
-                FROM (
-                    SELECT
-                        refs.*,
-                        CASE
-                            WHEN edition LIKE '%/%'
-                                THEN STR_TO_DATE(edition, '%Y/%m/%d')
-                            ELSE
-                                STR_TO_DATE(edition, '%Y%m%d')
-                        END AS pub_date
-                    FROM refs
-                ) r
-                INNER JOIN author_publication1
-                    ON r.id = author_publication1.rid
-                INNER JOIN author_alias
-                    ON author_publication1.auid = author_alias.auid
-                INNER JOIN people
-                    ON author_alias.pid = people.id
-                INNER JOIN people_department
-                    ON people.id = people_department.id
-                WHERE people_department.dept_id = 4
-                  AND YEAR(r.pub_date) = 2025
-                ORDER BY r.accession_number DESC;
-            """
-        },
-
-        {
-            "question": "List all publications published by the HSRE department in 2025",
-            "query": """
-                SELECT DISTINCT
-                    r.author,
-                    r.year,
-                    r.title,
-                    r.secondary_title,
-                    r.volume,
-                    r.number,
-                    r.pages,
-                    r.accession_number AS PMID,
-                    r.electronic_resource_number AS doi
-                FROM (
-                    SELECT
-                        refs.*,
-                        CASE
-                            WHEN edition LIKE '%/%'
-                                THEN STR_TO_DATE(edition, '%Y/%m/%d')
-                            ELSE
-                                STR_TO_DATE(edition, '%Y%m%d')
-                        END AS pub_date
-                    FROM refs
-                ) r
-                INNER JOIN author_publication1
-                    ON r.id = author_publication1.rid
-                INNER JOIN author_alias
-                    ON author_publication1.auid = author_alias.auid
-                INNER JOIN people
-                    ON author_alias.pid = people.id
-                INNER JOIN people_department
-                    ON people.id = people_department.id
-                WHERE people_department.dept_id = 5
-                  AND YEAR(r.pub_date) = 2025
-                ORDER BY r.accession_number DESC;
-            """
+        {"question": "List all publications published by HSRE department in the year 2025",
+        "query": "SELECT DISTINCT author, year, title, secondary_title, volume, number, pages, accession_number AS PMID, electronic_resource_number AS doi FROM (SELECT refs.*, CASE WHEN edition LIKE '%/%' THEN STR_TO_DATE(edition, '%Y/%m/%d')ELSE STR_TO_DATE(edition, '%Y%m%d') END AS pub_date FROM refs) r INNER JOIN author_publication1 ON r.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id INNER JOIN people_department ON people.id = people_department.id WHERE people_department.dept_id = 5 AND YEAR(pub_date) = 2025 ORDER BY accession_number DESC;",
+        #"query":"SELECT DISTINCT author, year, title, secondary_title, volume, number, pages, accession_number as PMID, electronic_resource_number as doi FROM refs INNER JOIN author_publication1 ON refs.id = author_publication1.rid INNER JOIN author_alias ON author_publication1.auid = author_alias.auid INNER JOIN people ON author_alias.pid = people.id INNER JOIN people_department ON people.id = people_department.id WHERE people_department.dept_id = 5 AND YEAR(STR_TO_DATE(edition, '%Y/%m/%d')) = 2025 ORDER BY accession_number DESC;"
         }
     ]
-
     return examples
