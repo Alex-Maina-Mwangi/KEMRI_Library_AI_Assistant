@@ -83,14 +83,19 @@ def get_database():
     return SQLDatabase.from_uri(
         db_uri,
         sample_rows_in_table_info=0,
-        pool_pre_ping=True,
+        engine_args={
+            "pool_pre_ping": True,
+            "pool_recycle": 1800,
+        },
     )
 
 
 try:
+
     db = get_database()
 
 except Exception as e:
+
     st.error(f"Database connection failed: {e}")
     st.stop()
 
@@ -99,16 +104,21 @@ except Exception as e:
 # 4. DATABASE SCHEMA
 # =========================================================
 
-@st.cache_data(ttl=1800, show_spinner=False)
+@st.cache_data(
+    ttl=1800,
+    show_spinner=False,
+)
 def get_schema():
 
     return db.get_context()["table_info"]
 
 
 try:
+
     schema_text = get_schema()
 
 except Exception as e:
+
     st.error(f"Could not retrieve database schema: {e}")
     st.stop()
 
@@ -123,15 +133,9 @@ def get_llm():
     return ChatMistralAI(
         api_key=MISTRAL_API_KEY,
         model="mistral-small-latest",
-
-        # SQL queries do not need lengthy responses.
         max_tokens=512,
-
         temperature=0.0,
-
-        # Retry handling is implemented separately below.
         max_retries=0,
-
         timeout=30,
     )
 
@@ -164,13 +168,6 @@ def is_rate_limit_error(error):
 
 
 def invoke_with_retry(chain, inputs, attempts=3):
-
-    """
-    Retry temporary Mistral rate limits.
-
-    Waits progressively longer between attempts.
-    Other errors are raised immediately.
-    """
 
     for attempt in range(attempts):
 
@@ -220,7 +217,6 @@ def get_valid_examples():
         if not question or not query:
             continue
 
-        # Exclude malformed examples such as LIMIT;
         if re.search(
             r"\bLIMIT\s*;?$",
             query.strip(),
@@ -233,7 +229,6 @@ def get_valid_examples():
             "query": query,
         })
 
-    # Keep the prompt compact.
     return valid[:8]
 
 
@@ -367,7 +362,6 @@ def validate_sql(sql):
     if not sql:
         raise ValueError("The generated SQL query is empty.")
 
-    # Only SELECT and WITH queries are allowed.
     if not re.match(
         r"^\s*(SELECT|WITH)\b",
         sql,
@@ -377,7 +371,6 @@ def validate_sql(sql):
             "Only SELECT queries are permitted."
         )
 
-    # Prevent multiple SQL statements.
     if ";" in sql:
         raise ValueError(
             "Multiple SQL statements are not permitted."
@@ -406,6 +399,7 @@ def validate_sql(sql):
             sql,
             flags=re.IGNORECASE,
         ):
+
             raise ValueError(
                 f"Unsafe SQL keyword detected: {keyword}"
             )
@@ -423,23 +417,13 @@ def validate_sql(sql):
 )
 def generate_sql_cached(question, schema):
 
-    """
-    Identical questions reuse previously generated SQL.
-
-    Cache duration: 15 minutes.
-    """
-
     response = invoke_with_retry(
-
         sql_chain,
-
         {
             "question": question,
             "schema": schema,
         },
-
         attempts=3,
-
     )
 
     return clean_sql(response)
@@ -475,6 +459,7 @@ def parse_result(result):
             if isinstance(raw, str):
 
                 try:
+
                     parsed = ast.literal_eval(raw)
 
                     if isinstance(parsed, list):
@@ -620,6 +605,16 @@ def extract_count(result):
                 if isinstance(value, (int, float)):
                     return int(value)
 
+                if isinstance(value, str):
+
+                    match = re.fullmatch(
+                        r"\s*-?\d+(?:\.\d+)?\s*",
+                        value,
+                    )
+
+                    if match:
+                        return int(float(value))
+
         if isinstance(first_row, (list, tuple)):
 
             for value in first_row:
@@ -684,6 +679,7 @@ PUBLICATION_COLUMNS = [
 def format_publication(row):
 
     if isinstance(row, dict):
+
         return ", ".join(
             str(value) for value in row.values()
         )
@@ -749,7 +745,7 @@ def list_results(question, schema):
             "full_data": None,
         }
 
-    # If SQL contains LIMIT, fetch the complete list.
+    # Fetch complete results if SQL has LIMIT.
     if re.search(
         r"\sLIMIT\s+\d+",
         sql,
@@ -762,21 +758,19 @@ def list_results(question, schema):
             unrestricted_sql
         )
 
+        complete_data = complete_result["result"]
+
         if (
-            isinstance(
-                complete_result["result"],
-                str,
-            )
-            and complete_result["result"].startswith(
-                "SQL ERROR"
-            )
+            isinstance(complete_data, str)
+            and complete_data.startswith("SQL ERROR")
         ):
+
             return {
-                "response": complete_result["result"],
+                "response": complete_data,
                 "full_data": None,
             }
 
-        full_data = complete_result["result"]
+        full_data = complete_data
         full_list = parse_result(full_data)
 
     total_count = len(full_list)
@@ -921,7 +915,6 @@ def web_search(question):
         results = search_tool.invoke(question)
 
         if isinstance(results, str):
-
             return results
 
         search_results = results.get(
@@ -940,8 +933,13 @@ def web_search(question):
             start=1,
         ):
 
-            title = item.get("title", "Search result")
+            title = item.get(
+                "title",
+                "Search result",
+            )
+
             url = item.get("url", "")
+
             content = item.get("content", "")
 
             lines.append(
@@ -949,7 +947,7 @@ def web_search(question):
                 f"{content[:700]}\n"
             )
 
-        # No second Mistral request.
+        # No Mistral call for web summaries.
         return "\n".join(lines)
 
     except Exception as e:
@@ -1005,6 +1003,7 @@ def agent_router(question):
             "Hello there! How can I help you today? "
             "Ask me any question about KWTRP publications."
         ),
+
     }
 
     if q in greetings:
@@ -1032,6 +1031,7 @@ def agent_router(question):
         "department",
         "researcher",
         "scientist",
+
     ]
 
     if any(
@@ -1095,6 +1095,7 @@ if "chat_history" not in st.session_state:
                 "***The first ever AI-Agent to work at KEMRI***. "
                 "I am a library assistant designed and "
                 "developed by Alex Maina.\n\n"
+
                 "**Ask me any question about "
                 "KEMRI-WELLCOME TRUST RESEARCH "
                 "PROGRAMME PUBLICATIONS.**"
@@ -1114,11 +1115,13 @@ for message in st.session_state.chat_history:
     if isinstance(message, HumanMessage):
 
         with st.chat_message("human"):
+
             st.markdown(message.content)
 
     elif isinstance(message, AIMessage):
 
         with st.chat_message("ai"):
+
             st.markdown(
                 message.content,
                 unsafe_allow_html=True,
@@ -1147,7 +1150,10 @@ def handle_excel_answer(answer):
         if excel_bytes is None:
 
             with st.chat_message("ai"):
-                st.error("No valid publication data to export.")
+
+                st.error(
+                    "No valid publication data to export."
+                )
 
         else:
 
@@ -1183,7 +1189,10 @@ def handle_excel_answer(answer):
         )
 
         with st.chat_message("ai"):
-            st.markdown("No Excel file was created.")
+
+            st.markdown(
+                "No Excel file was created."
+            )
 
         return True
 
@@ -1204,6 +1213,7 @@ if question:
     )
 
     with st.chat_message("human"):
+
         st.markdown(question)
 
     # -----------------------------------------------------
@@ -1233,7 +1243,6 @@ if question:
             st.stop()
 
         # A new question is not treated as "no".
-        # Clear the old pending export and continue.
         st.session_state.pop(
             "pending_excel_data",
             None,
@@ -1258,7 +1267,9 @@ if question:
 
         except Exception as e:
 
-            ai_response = f"An unexpected error occurred: {e}"
+            ai_response = (
+                f"An unexpected error occurred: {e}"
+            )
 
             st.error(ai_response)
 
